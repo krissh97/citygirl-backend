@@ -26,7 +26,6 @@ const storage = multerS3({
   bucket: process.env.AWS_S3_BUCKET,
   contentType: multerS3.AUTO_CONTENT_TYPE,
   // Public read so URLs work directly in the browser
-  acl: 'public-read',
   key(req, file, cb) {
     const folder = file.fieldname === 'video' ? 'videos' : 'images';
     const safe   = file.originalname.replace(/\s+/g, '-').toLowerCase();
