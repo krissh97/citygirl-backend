@@ -5,6 +5,7 @@ const Order      = require('../models/Order');
 const Saree      = require('../models/Saree');
 const auth       = require('../middleware/auth');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
 
 // ─── Email helper ─────────────────────────────────────────────
 async function notifySellerByEmail(order) {
@@ -56,27 +57,40 @@ router.post('/', async (req, res) => {
   try {
     const { customer, items, pricing } = req.body;
 
-    // Stock validation
-    for (const item of items) {
-      if (!item.sareeId) continue;
-      const s = await Saree.findById(item.sareeId);
-      if (s && s.stock < item.qty)
-        return res.status(400).json({ error: `Only ${s.stock} left for "${s.name}"` });
-    }
+    // Safely cast sareeId strings to ObjectId
+    const cleanItems = items.map(item => ({
+      ...item,
+      sareeId: item.sareeId
+        ? mongoose.Types.ObjectId.createFromHexString
+          ? new mongoose.Types.ObjectId(item.sareeId)
+          : item.sareeId
+        : undefined,
+    }));
 
-    const order = await Order.create({ customer, items, pricing });
+    const order = await Order.create({
+      customer,
+      items: cleanItems,
+      pricing,
+    });
 
     // Deduct stock
-    for (const item of items) {
-      if (item.sareeId)
-        await Saree.findByIdAndUpdate(item.sareeId, { $inc: { stock: -item.qty } });
+    for (const item of cleanItems) {
+      if (item.sareeId) {
+        await Saree.findByIdAndUpdate(item.sareeId, {
+          $inc: { stock: -item.qty },
+        });
+      }
     }
 
-    // Email — fire and forget
-    notifySellerByEmail(order).catch(e => console.error('Email failed:', e.message));
+    notifySellerByEmail(order).catch(e =>
+      console.error('Email failed:', e.message)
+    );
 
     res.status(201).json({ success: true, orderId: order.orderId });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('Order error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─── ADMIN: list all orders ───────────────────────────────────
