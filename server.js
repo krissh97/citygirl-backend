@@ -1,24 +1,22 @@
 require('dotenv').config();
-const express = require('express');
-const cors    = require('cors');
+const express  = require('express');
+const cors     = require('cors');
 const mongoose = require('mongoose');
 
 const app = express();
 
-// ── CORS: allow your Vercel frontend ─────────────────────────
-const allowedOrigins = [
-  'http://localhost:3000',
-  process.env.FRONTEND_URL,          // e.g. https://city-girl-sarees.vercel.app
-].filter(Boolean);
+// ── CORS — must be before everything else ─────────────────────
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
-app.use(cors({
-  origin: (origin, cb) => {
-    // allow Postman / curl (no origin) and listed origins
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-}));
+  // OPTIONS preflight — respond immediately with 200
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -26,15 +24,18 @@ app.use(express.urlencoded({ extended: true }));
 // ── MongoDB ───────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => { console.error('❌ MongoDB failed:', err.message); process.exit(1); });
+  .catch(err => {
+    console.error('❌ MongoDB failed:', err.message);
+    process.exit(1);
+  });
 
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/admin',  require('./routes/admin'));
 app.use('/api/sarees', require('./routes/sarees'));
 app.use('/api/orders', require('./routes/orders'));
 
-// ── Health check (Railway uses this) ─────────────────────────
-app.get('/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
+// ── Health check ──────────────────────────────────────────────
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 // ── 404 ───────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: `${req.method} ${req.path} not found` }));
