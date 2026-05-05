@@ -74,13 +74,7 @@ router.post('/', async (req, res) => {
     });
 
     // Deduct stock
-    for (const item of cleanItems) {
-      if (item.sareeId) {
-        await Saree.findByIdAndUpdate(item.sareeId, {
-          $inc: { stock: -item.qty },
-        });
-      }
-    }
+    
 
     notifySellerByEmail(order).catch(e =>
       console.error('Email failed:', e.message)
@@ -110,10 +104,42 @@ router.get('/', auth, async (req, res) => {
 // ─── ADMIN: update status ─────────────────────────────────────
 router.patch('/:id/status', auth, async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-    if (!order) return res.status(404).json({ error: 'Not found' });
+    const { status } = req.body;
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const previousStatus = order.status;
+
+    // Deduct stock only when moving TO confirmed for the first time
+    if (status === 'confirmed' && previousStatus !== 'confirmed') {
+      for (const item of order.items) {
+        if (item.sareeId) {
+          await Saree.findByIdAndUpdate(item.sareeId, {
+            $inc: { stock: -item.qty },
+          });
+        }
+      }
+    }
+
+    // If moving BACK from confirmed to pending, restore stock
+    if (status === 'pending' && previousStatus === 'confirmed') {
+      for (const item of order.items) {
+        if (item.sareeId) {
+          await Saree.findByIdAndUpdate(item.sareeId, {
+            $inc: { stock: +item.qty },
+          });
+        }
+      }
+    }
+
+    order.status = status;
+    await order.save();
+
     res.json(order);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
