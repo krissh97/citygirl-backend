@@ -132,7 +132,15 @@ router.patch('/:id/status', auth, async (req, res) => {
         }
       }
     }
-
+    if (status === 'cancelled' && previousStatus === 'confirmed') {
+      for (const item of order.items) {
+        if (item.sareeId) {
+          await Saree.findByIdAndUpdate(item.sareeId, {
+            $inc: { stock: +item.qty },
+          });
+        }
+      }
+    }
     order.status = status;
     await order.save();
 
