@@ -30,6 +30,7 @@ const sareeSchema = new mongoose.Schema({
 
   // Primary color (the "main" version of this saree)
   color:         { type: String, required: true, trim: true },
+  colors:        { type: [String], default: [] },
   price:         { type: Number, required: true, min: 0 },
   originalPrice: { type: Number, default: null },
   stock:         { type: Number, required: true, min: 0, default: 0 },
