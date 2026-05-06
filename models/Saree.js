@@ -36,6 +36,7 @@ const sareeSchema = new mongoose.Schema({
   stock:         { type: Number, required: true, min: 0, default: 0 },
   size:          { type: String, default: '5.5m' },
   blouseIncluded:{ type: Boolean, default: false },
+  blouseColor:    { type: String, default: '', trim: true },
   weight:        { type: String, default: '' },
 
   // Media for the primary color
